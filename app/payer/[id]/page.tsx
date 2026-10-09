@@ -15,13 +15,20 @@ type Eleve = {
     frais_scolarite: number
     frais_inscription: number
     frais_generaux: number
+    ecole_id: string
   }
+}
+
+type Ecole = {
+  nom: string
+  numero_momo: string
 }
 
 export default function PagePaiement({ params }: { params: { id: string } }) {
   const eleveId = params.id
 
   const [eleve, setEleve] = useState<Eleve | null>(null)
+  const [ecole, setEcole] = useState<Ecole | null>(null)
   const [etape, setEtape] = useState<'details' | 'ussd' | 'confirmation' | 'succes' | 'deja_paye'>('details')
   const [reference, setReference] = useState('')
   const [loading, setLoading] = useState(true)
@@ -35,15 +42,26 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
   async function chargerEleve() {
     const { data } = await supabase
       .from('eleves')
-      .select('*, classes(nom, frais_scolarite, frais_inscription, frais_generaux)')
+      .select('*, classes(nom, frais_scolarite, frais_inscription, frais_generaux, ecole_id)')
       .eq('id', eleveId)
       .single()
 
     if (data) {
       setEleve(data)
       verifierPaiement(data)
+      chargerEcole(data.classes?.ecole_id)
     }
     setLoading(false)
+  }
+
+  async function chargerEcole(ecoleId: string) {
+    if (!ecoleId) return
+    const { data } = await supabase
+      .from('ecoles')
+      .select('nom, numero_momo')
+      .eq('id', ecoleId)
+      .single()
+    if (data) setEcole(data)
   }
 
   async function verifierPaiement(eleve: Eleve) {
@@ -147,7 +165,7 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
         <div className="bg-blue-600 px-6 py-5 text-white">
           <div className="flex items-center gap-3 mb-1">
             <div className="bg-white text-blue-600 font-bold w-8 h-8 rounded-lg flex items-center justify-center text-sm">E</div>
-            <span className="font-bold text-lg">EduPay</span>
+            <span className="font-bold text-lg">{ecole?.nom || 'EduPay'}</span>
           </div>
           <p className="text-blue-100 text-sm">Paiement scolaire sécurisé 🇧🇯</p>
         </div>
@@ -228,8 +246,11 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
                   <div className="bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">3</div>
                   <div>
                     <p className="font-medium text-gray-800">Entrez le numéro de l'école</p>
-                    <div className="bg-gray-100 rounded-xl px-4 py-2 mt-1 inline-block">
-                      <p className="font-bold text-gray-800 text-lg">+229 XX XX XX XX</p>
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mt-1">
+                      <p className="text-xs text-green-600 mb-1">Numéro Mobile Money</p>
+                      <p className="font-bold text-green-700 text-xl">
+                        {ecole?.numero_momo || 'Non configuré'}
+                      </p>
                     </div>
                   </div>
                 </div>

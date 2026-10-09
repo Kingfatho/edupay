@@ -6,22 +6,48 @@ import { useRouter } from 'next/navigation'
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [totalPaye, setTotalPaye] = useState(0)
+  const [totalAttente, setTotalAttente] = useState(0)
+  const [totalAttendu, setTotalAttendu] = useState(0)
 
   useEffect(() => {
-    async function verifier() {
+    async function init() {
       const { data } = await supabase.auth.getSession()
       if (!data.session) {
         router.push('/')
       } else {
         setUser(data.session.user)
+        chargerStats()
       }
     }
-    verifier()
+    init()
   }, [])
+
+  async function chargerStats() {
+    const { data: paiements } = await supabase
+      .from('paiements')
+      .select('montant, statut')
+
+    if (paiements) {
+      const paye = paiements
+        .filter(p => p.statut === 'paye')
+        .reduce((sum, p) => sum + p.montant, 0)
+      const attente = paiements
+        .filter(p => p.statut === 'en_attente')
+        .reduce((sum, p) => sum + p.montant, 0)
+      setTotalPaye(paye)
+      setTotalAttente(attente)
+      setTotalAttendu(paye + attente)
+    }
+  }
 
   async function deconnecter() {
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  function formaterFCFA(montant: number) {
+    return montant.toLocaleString('fr-FR') + ' FCFA'
   }
 
   return (
@@ -53,17 +79,17 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <p className="text-gray-500 text-sm">Total attendu</p>
-            <p className="text-3xl font-bold text-gray-800 mt-1">0 FCFA</p>
+            <p className="text-3xl font-bold text-gray-800 mt-1">{formaterFCFA(totalAttendu)}</p>
             <p className="text-blue-500 text-sm mt-2">Ce mois</p>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <p className="text-gray-500 text-sm">Total encaissé</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">0 FCFA</p>
+            <p className="text-3xl font-bold text-green-600 mt-1">{formaterFCFA(totalPaye)}</p>
             <p className="text-green-500 text-sm mt-2">Paiements reçus</p>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <p className="text-gray-500 text-sm">En attente</p>
-            <p className="text-3xl font-bold text-orange-500 mt-1">0 FCFA</p>
+            <p className="text-3xl font-bold text-orange-500 mt-1">{formaterFCFA(totalAttente)}</p>
             <p className="text-orange-400 text-sm mt-2">Non payés</p>
           </div>
         </div>
@@ -102,6 +128,14 @@ export default function Dashboard() {
             <div className="text-3xl mb-3">📲</div>
             <h3 className="font-bold text-gray-800">Envoyer les liens</h3>
             <p className="text-gray-500 text-sm mt-1">Notifier les parents en un clic</p>
+          </div>
+          <div
+            onClick={() => router.push('/parametres')}
+            className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 cursor-pointer hover:border-blue-300 transition-colors"
+          >
+            <div className="text-3xl mb-3">⚙️</div>
+            <h3 className="font-bold text-gray-800">Paramètres</h3>
+            <p className="text-gray-500 text-sm mt-1">Configurer l'école et le numéro momo</p>
           </div>
         </div>
       </div>
