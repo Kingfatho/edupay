@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabase'
 
+type Classe = {
+  nom: string
+  frais_scolarite: number
+  frais_inscription: number
+  frais_generaux: number
+  ecole_id: string
+}
+
 type Eleve = {
   id: string
   nom: string
@@ -10,13 +18,8 @@ type Eleve = {
   whatsapp_parent1: string
   cantine: boolean
   bus: boolean
-  classes: {
-    nom: string
-    frais_scolarite: number
-    frais_inscription: number
-    frais_generaux: number
-    ecole_id: string
-  }
+  classe_id: string
+  classes: Classe
 }
 
 type Ecole = {
@@ -24,8 +27,18 @@ type Ecole = {
   numero_momo: string
 }
 
-export default function PagePaiement({ params }: { params: { id: string } }) {
-  const eleveId = params.id
+export default function PagePaiement({ params }: { params: Promise<{ id: string }> }) {
+  const [eleveId, setEleveId] = useState<string>('')
+
+  useEffect(() => {
+    Promise.resolve(params).then((p) => {
+      setEleveId(p.id)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (eleveId) chargerEleve()
+  }, [eleveId])
 
   const [eleve, setEleve] = useState<Eleve | null>(null)
   const [ecole, setEcole] = useState<Ecole | null>(null)
@@ -34,28 +47,49 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [erreur, setErreur] = useState('')
+  const [debugMsg, setDebugMsg] = useState('')
 
-  useEffect(() => {
-    chargerEleve()
-  }, [eleveId])
 
   async function chargerEleve() {
-    const { data } = await supabase
+    console.log('Chargement élève ID:', eleveId)
+
+    const { data, error } = await supabase
       .from('eleves')
-      .select('*, classes(nom, frais_scolarite, frais_inscription, frais_generaux, ecole_id)')
+      .select(`
+        id, nom, prenom, whatsapp_parent1, cantine, bus, classe_id,
+        classes (
+          nom,
+          frais_scolarite,
+          frais_inscription,
+          frais_generaux,
+          ecole_id
+        )
+      `)
       .eq('id', eleveId)
       .single()
 
+    console.log('DATA:', JSON.stringify(data))
+    console.log('ERROR:', JSON.stringify(error))
+
+    if (error) {
+      setDebugMsg('Erreur: ' + error.message)
+      setLoading(false)
+      return
+    }
+
     if (data) {
-      setEleve(data)
-      verifierPaiement(data)
-      chargerEcole(data.classes?.ecole_id)
+      setEleve(data as any)
+      verifierPaiement(data.id)
+      if ((data.classes as any)?.ecole_id) {
+        chargerEcole((data.classes as any).ecole_id)
+      }
+    } else {
+      setDebugMsg('Aucune donnée trouvée pour cet ID')
     }
     setLoading(false)
   }
 
   async function chargerEcole(ecoleId: string) {
-    if (!ecoleId) return
     const { data } = await supabase
       .from('ecoles')
       .select('nom, numero_momo')
@@ -64,11 +98,11 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
     if (data) setEcole(data)
   }
 
-  async function verifierPaiement(eleve: Eleve) {
+  async function verifierPaiement(id: string) {
     const { data } = await supabase
       .from('paiements')
       .select('*')
-      .eq('eleve_id', eleve.id)
+      .eq('eleve_id', id)
       .eq('statut', 'paye')
       .limit(1)
 
@@ -77,12 +111,10 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
     }
   }
 
-  function calculerTotal(eleve: Eleve) {
-    return (
-      (eleve.classes?.frais_scolarite || 0) +
-      (eleve.classes?.frais_inscription || 0) +
-      (eleve.classes?.frais_generaux || 0)
-    )
+  function calculerTotal() {
+    if (!eleve) return 0
+    const c = eleve.classes as any
+    return (c?.frais_scolarite || 0) + (c?.frais_inscription || 0) + (c?.frais_generaux || 0)
   }
 
   function formaterFCFA(montant: number) {
@@ -111,11 +143,12 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
       return
     }
 
-    const total = calculerTotal(eleve)
+    const total = calculerTotal()
+    const c = eleve.classes as any
 
     const { error } = await supabase.from('paiements').insert({
       eleve_id: eleve.id,
-      type_frais: 'Scolarité ' + eleve.classes?.nom,
+      type_frais: 'Scolarité ' + c?.nom,
       montant: total,
       statut: 'paye',
       reference_paiement: reference.trim(),
@@ -151,12 +184,16 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
           <div className="text-4xl mb-4">❌</div>
           <p className="text-gray-700 font-bold">Lien invalide</p>
           <p className="text-gray-500 text-sm mt-2">Ce lien de paiement n'existe pas</p>
+          {debugMsg && (
+            <p className="text-red-500 text-xs mt-4 bg-red-50 p-3 rounded-xl">{debugMsg}</p>
+          )}
         </div>
       </div>
     )
   }
 
-  const total = calculerTotal(eleve)
+  const total = calculerTotal()
+  const c = eleve.classes as any
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -184,19 +221,19 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
           {etape === 'details' && (
             <div>
               <h2 className="text-lg font-bold text-gray-800 mb-1">Frais scolaires</h2>
-              <p className="text-gray-500 text-sm mb-5">{eleve.prenom} {eleve.nom} — {eleve.classes?.nom}</p>
+              <p className="text-gray-500 text-sm mb-5">{eleve.prenom} {eleve.nom} — {c?.nom}</p>
               <div className="bg-gray-50 rounded-xl p-4 mb-5 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Scolarité</span>
-                  <span className="font-medium text-gray-800">{formaterFCFA(eleve.classes?.frais_scolarite || 0)}</span>
+                  <span className="font-medium text-gray-800">{formaterFCFA(c?.frais_scolarite || 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Inscription</span>
-                  <span className="font-medium text-gray-800">{formaterFCFA(eleve.classes?.frais_inscription || 0)}</span>
+                  <span className="font-medium text-gray-800">{formaterFCFA(c?.frais_inscription || 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Frais généraux</span>
-                  <span className="font-medium text-gray-800">{formaterFCFA(eleve.classes?.frais_generaux || 0)}</span>
+                  <span className="font-medium text-gray-800">{formaterFCFA(c?.frais_generaux || 0)}</span>
                 </div>
                 {eleve.cantine && (
                   <div className="flex justify-between text-sm">
@@ -325,7 +362,7 @@ export default function PagePaiement({ params }: { params: { id: string } }) {
                 </div>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-gray-500">Classe</span>
-                  <span className="font-medium text-gray-800">{eleve.classes?.nom}</span>
+                  <span className="font-medium text-gray-800">{c?.nom}</span>
                 </div>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-gray-500">Montant</span>
