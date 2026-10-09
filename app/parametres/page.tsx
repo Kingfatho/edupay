@@ -11,6 +11,8 @@ export default function Parametres() {
   const [nom, setNom] = useState('')
   const [nomComplet, setNomComplet] = useState('')
   const [numeroMomo, setNumeroMomo] = useState('')
+  const [fraisCantine, setFraisCantine] = useState('')
+  const [fraisBus, setFraisBus] = useState('')
   const [succes, setSucces] = useState(false)
 
   useEffect(() => {
@@ -26,6 +28,8 @@ export default function Parametres() {
         setNom(data.nom || '')
         setNomComplet(data.nom_complet || '')
         setNumeroMomo(data.numero_momo || '')
+        setFraisCantine(data.frais_cantine || '')
+        setFraisBus(data.frais_bus || '')
       }
       setLoading(false)
     }
@@ -40,6 +44,8 @@ export default function Parametres() {
       nom,
       nom_complet: nomComplet,
       numero_momo: numeroMomo,
+      frais_cantine: parseFloat(fraisCantine) || 0,
+      frais_bus: parseFloat(fraisBus) || 0,
     }).eq('id', ecoleId)
     setSaving(false)
     setSucces(true)
@@ -68,15 +74,14 @@ export default function Parametres() {
         </div>
       </div>
 
-      <div className="p-6 max-w-xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="font-bold text-gray-800 mb-6">Informations de l'école</h2>
+      <div className="p-6 max-w-xl mx-auto space-y-6">
 
+        {/* Informations école */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="font-bold text-gray-800 mb-4">🏫 Informations de l'école</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nom court de l'école *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom court *</label>
               <input
                 value={nom}
                 onChange={(e) => setNom(e.target.value)}
@@ -84,11 +89,8 @@ export default function Parametres() {
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nom complet officiel
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom complet officiel</label>
               <input
                 value={nomComplet}
                 onChange={(e) => setNomComplet(e.target.value)}
@@ -96,37 +98,62 @@ export default function Parametres() {
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Numéro Mobile Money de l'école *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Numéro Mobile Money *</label>
               <input
                 value={numeroMomo}
                 onChange={(e) => setNumeroMomo(e.target.value)}
                 placeholder="+229 XX XX XX XX"
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
               />
-              <p className="text-gray-400 text-xs mt-1">
-                C'est le numéro sur lequel les parents vont envoyer l'argent
-              </p>
+              <p className="text-gray-400 text-xs mt-1">Numéro sur lequel les parents envoient l'argent</p>
             </div>
           </div>
-
-          {succes && (
-            <div className="bg-green-50 text-green-600 text-sm px-4 py-3 rounded-xl mt-4">
-              ✅ Paramètres sauvegardés avec succès
-            </div>
-          )}
-
-          <button
-            onClick={sauvegarder}
-            disabled={saving}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 mt-6"
-          >
-            {saving ? 'Sauvegarde...' : 'Sauvegarder'}
-          </button>
         </div>
+
+        {/* Frais collectifs */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="font-bold text-gray-800 mb-4">💰 Frais collectifs</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">🍽️ Frais de cantine (FCFA/mois)</label>
+              <input
+                type="number"
+                value={fraisCantine}
+                onChange={(e) => setFraisCantine(e.target.value)}
+                placeholder="0"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+              />
+              <p className="text-gray-400 text-xs mt-1">Ajouté automatiquement aux élèves inscrits à la cantine</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">🚌 Frais de bus (FCFA/mois)</label>
+              <input
+                type="number"
+                value={fraisBus}
+                onChange={(e) => setFraisBus(e.target.value)}
+                placeholder="0"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+              />
+              <p className="text-gray-400 text-xs mt-1">Ajouté automatiquement aux élèves qui prennent le bus</p>
+            </div>
+          </div>
+        </div>
+
+        {succes && (
+          <div className="bg-green-50 text-green-600 text-sm px-4 py-3 rounded-xl">
+            ✅ Paramètres sauvegardés avec succès
+          </div>
+        )}
+
+        <button
+          onClick={sauvegarder}
+          disabled={saving}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
+        >
+          {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+        </button>
+
       </div>
     </div>
   )

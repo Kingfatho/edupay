@@ -25,10 +25,20 @@ type Eleve = {
 type Ecole = {
   nom: string
   numero_momo: string
+  frais_cantine: number
+  frais_bus: number
 }
 
 export default function PagePaiement({ params }: { params: Promise<{ id: string }> }) {
   const [eleveId, setEleveId] = useState<string>('')
+  const [eleve, setEleve] = useState<Eleve | null>(null)
+  const [ecole, setEcole] = useState<Ecole | null>(null)
+  const [etape, setEtape] = useState<'details' | 'ussd' | 'confirmation' | 'succes' | 'deja_paye'>('details')
+  const [reference, setReference] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [erreur, setErreur] = useState('')
+  const [debugMsg, setDebugMsg] = useState('')
 
   useEffect(() => {
     Promise.resolve(params).then((p) => {
@@ -40,19 +50,7 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
     if (eleveId) chargerEleve()
   }, [eleveId])
 
-  const [eleve, setEleve] = useState<Eleve | null>(null)
-  const [ecole, setEcole] = useState<Ecole | null>(null)
-  const [etape, setEtape] = useState<'details' | 'ussd' | 'confirmation' | 'succes' | 'deja_paye'>('details')
-  const [reference, setReference] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [erreur, setErreur] = useState('')
-  const [debugMsg, setDebugMsg] = useState('')
-
-
   async function chargerEleve() {
-    console.log('Chargement élève ID:', eleveId)
-
     const { data, error } = await supabase
       .from('eleves')
       .select(`
@@ -68,9 +66,6 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
       .eq('id', eleveId)
       .single()
 
-    console.log('DATA:', JSON.stringify(data))
-    console.log('ERROR:', JSON.stringify(error))
-
     if (error) {
       setDebugMsg('Erreur: ' + error.message)
       setLoading(false)
@@ -81,7 +76,7 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
       setEleve(data as any)
       verifierPaiement(data.id)
       if ((data.classes as any)?.ecole_id) {
-        chargerEcole((data.classes as any).ecole_id)
+        await chargerEcole((data.classes as any).ecole_id)
       }
     } else {
       setDebugMsg('Aucune donnée trouvée pour cet ID')
@@ -92,10 +87,14 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
   async function chargerEcole(ecoleId: string) {
     const { data } = await supabase
       .from('ecoles')
-      .select('nom, numero_momo')
+      .select('nom, numero_momo, frais_cantine, frais_bus')
       .eq('id', ecoleId)
       .single()
-    if (data) setEcole(data)
+    if (data) {
+      setEcole(data)
+      return data
+    }
+    return null
   }
 
   async function verifierPaiement(id: string) {
@@ -111,10 +110,14 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
     }
   }
 
-  function calculerTotal() {
+  function calculerTotal(ecoleData?: Ecole | null) {
     if (!eleve) return 0
     const c = eleve.classes as any
-    return (c?.frais_scolarite || 0) + (c?.frais_inscription || 0) + (c?.frais_generaux || 0)
+    const e = ecoleData || ecole
+    let total = (c?.frais_scolarite || 0) + (c?.frais_inscription || 0) + (c?.frais_generaux || 0)
+    if (eleve.cantine && e?.frais_cantine) total += e.frais_cantine
+    if (eleve.bus && e?.frais_bus) total += e.frais_bus
+    return total
   }
 
   function formaterFCFA(montant: number) {
@@ -143,7 +146,7 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
       return
     }
 
-    const total = calculerTotal()
+    const total = calculerTotal(ecole)
     const c = eleve.classes as any
 
     const { error } = await supabase.from('paiements').insert({
@@ -192,7 +195,7 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
     )
   }
 
-  const total = calculerTotal()
+  const total = calculerTotal(ecole)
   const c = eleve.classes as any
 
   return (
@@ -238,13 +241,13 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
                 {eleve.cantine && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">🍽️ Cantine</span>
-                    <span className="font-medium text-orange-500">Inclus</span>
+                    <span className="font-medium text-orange-500">{formaterFCFA(ecole?.frais_cantine || 0)}</span>
                   </div>
                 )}
                 {eleve.bus && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">🚌 Bus</span>
-                    <span className="font-medium text-green-500">Inclus</span>
+                    <span className="font-medium text-green-500">{formaterFCFA(ecole?.frais_bus || 0)}</span>
                   </div>
                 )}
                 <div className="border-t border-gray-200 pt-3 flex justify-between">
@@ -285,9 +288,7 @@ export default function PagePaiement({ params }: { params: Promise<{ id: string 
                     <p className="font-medium text-gray-800">Entrez le numéro de l'école</p>
                     <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mt-1">
                       <p className="text-xs text-green-600 mb-1">Numéro Mobile Money</p>
-                      <p className="font-bold text-green-700 text-xl">
-                        {ecole?.numero_momo || 'Non configuré'}
-                      </p>
+                      <p className="font-bold text-green-700 text-xl">{ecole?.numero_momo || 'Non configuré'}</p>
                     </div>
                   </div>
                 </div>
