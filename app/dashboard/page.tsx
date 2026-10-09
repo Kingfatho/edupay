@@ -137,6 +137,22 @@ export default function Dashboard() {
             <h3 className="font-bold text-gray-800">Paramètres</h3>
             <p className="text-gray-500 text-sm mt-1">Configurer l'école et le numéro momo</p>
           </div>
+          <div
+            onClick={() => router.push('/tranches')}
+            className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 cursor-pointer hover:border-blue-300 transition-colors"
+          >
+            <div className="text-3xl mb-3">📅</div>
+            <h3 className="font-bold text-gray-800">Tranches</h3>
+            <p className="text-gray-500 text-sm mt-1">Configurer les tranches de paiement</p>
+          </div>
+          <div
+            onClick={() => router.push('/relances')}
+            className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 cursor-pointer hover:border-blue-300 transition-colors"
+          >
+            <div className="text-3xl mb-3">🔔</div>
+            <h3 className="font-bold text-gray-800">Relances</h3>
+            <p className="text-gray-500 text-sm mt-1">Notifier les parents en retard</p>
+          </div>
         </div>
       </div>
     </div>
